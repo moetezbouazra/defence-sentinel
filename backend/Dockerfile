@@ -2,17 +2,15 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Install OpenSSL 1.1 compatibility for Prisma
-RUN apk add --no-cache openssl
+# Install dependencies for Prisma and bcrypt
+RUN apk add --no-cache openssl python3 make g++
 
-COPY package*.json ./
+COPY package*.json yarn.lock ./
 
-RUN npm config set fetch-retry-maxtimeout 600000 \
-    && npm config set fetch-retry-mintimeout 10000 \
-    && npm install
+RUN yarn install --frozen-lockfile
 
 COPY . .
 
 RUN npx prisma generate
 
-CMD ["npm", "run", "dev"]
+CMD ["yarn", "dev"]

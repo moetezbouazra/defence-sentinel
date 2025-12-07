@@ -1,13 +1,11 @@
-FROM node:20-alpine
+FROM node:22-alpine
 
 WORKDIR /app
 
-COPY package*.json ./
+COPY package*.json yarn.lock ./
 
-RUN npm config set fetch-retry-maxtimeout 600000 \
-    && npm config set fetch-retry-mintimeout 10000 \
-    && npm install
+RUN yarn install --frozen-lockfile
 
 COPY . .
 
-CMD ["npm", "run", "dev", "--", "--host"]
+CMD ["yarn", "dev", "--host"]

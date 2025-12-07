@@ -461,7 +461,7 @@ When HIGH or CRITICAL alert is generated, send webhook with:
 ## 🚀 Implementation Phases
 
 ### Phase 1: Foundation & Infrastructure
-- Set up Docker Compose (use 'docker compose' command instead of 'docker-compose') with PostgreSQL, Redis, Mosquitto
+- Set up Docker Compose with PostgreSQL, Redis, Mosquitto
 - Initialize backend with Express/Fastify + TypeScript
 - Set up Prisma with database schema
 - Implement authentication (register, login, JWT)

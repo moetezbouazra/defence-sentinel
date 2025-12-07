@@ -5,9 +5,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Search } from 'lucide-react';
 import { format } from 'date-fns';
+import { motion } from 'framer-motion';
 import type { Detection, PaginatedResponse } from '@/types';
+import PageTransition from '@/components/PageTransition';
+import { EmptyState } from '@/components/ui/empty-state';
 
 export default function Detections() {
   const [page, setPage] = useState(1);
@@ -30,33 +33,58 @@ export default function Detections() {
   }
 
   return (
+    <PageTransition>
     <div className="space-y-6 p-6">
-      <h1 className="text-3xl font-bold tracking-tight">Detections</h1>
+      <motion.h1 
+        className="text-3xl font-bold tracking-tight"
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+      >
+        Detections
+      </motion.h1>
 
       <div className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Detections</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats?.total || 0}</div>
-          </CardContent>
-        </Card>
-        {/* Add more stats cards here */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+        >
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Detections</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats?.total || 0}</div>
+            </CardContent>
+          </Card>
+        </motion.div>
+        {/* Add more animated stats cards here */}
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Recent Detections</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Class</TableHead>
-                <TableHead>Confidence</TableHead>
-                <TableHead>Threat Level</TableHead>
-                <TableHead>Time</TableHead>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+      >
+        <Card>
+          <CardHeader>
+            <CardTitle>Recent Detections</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {data?.data.length === 0 ? (
+              <EmptyState
+                icon={Search}
+                title="No detections"
+                description="No objects have been detected yet. Wait for camera events to trigger detections."
+              />
+            ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Class</TableHead>
+                  <TableHead>Confidence</TableHead>
+                  <TableHead>Threat Level</TableHead>
+                  <TableHead>Time</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -76,8 +104,10 @@ export default function Detections() {
               ))}
             </TableBody>
           </Table>
+            )}
         </CardContent>
       </Card>
+      </motion.div>
 
       <div className="flex justify-center gap-2">
         <Button
@@ -99,5 +129,6 @@ export default function Detections() {
         </Button>
       </div>
     </div>
+    </PageTransition>
   );
 }

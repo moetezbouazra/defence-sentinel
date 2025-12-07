@@ -3,9 +3,30 @@ import prisma from '../utils/prisma';
 import { getIo } from './socketService';
 import axios from 'axios';
 import FormData from 'form-data';
+import fs from 'fs/promises';
+import path from 'path';
+import sharp from 'sharp';
 
 const MQTT_URL = process.env.MQTT_URL || 'mqtt://localhost:1883';
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://localhost:8000';
+const UPLOAD_DIR = path.join(__dirname, '../../uploads');
+const THUMBNAIL_DIR = path.join(UPLOAD_DIR, 'thumbnails');
+const ORIGINAL_DIR = path.join(UPLOAD_DIR, 'original');
+const ANNOTATED_DIR = path.join(UPLOAD_DIR, 'annotated');
+
+// Ensure upload directories exist
+const ensureDirectories = async () => {
+  try {
+    await fs.mkdir(UPLOAD_DIR, { recursive: true });
+    await fs.mkdir(THUMBNAIL_DIR, { recursive: true });
+    await fs.mkdir(ORIGINAL_DIR, { recursive: true });
+    await fs.mkdir(ANNOTATED_DIR, { recursive: true });
+  } catch (error) {
+    console.error('Error creating upload directories:', error);
+  }
+};
+
+ensureDirectories();
 
 export const initMqtt = () => {
   const client = mqtt.connect(MQTT_URL);
@@ -121,6 +142,23 @@ const handleImageMessage = async (deviceId: string, payload: any) => {
     // Convert base64 to buffer
     const imageBuffer = Buffer.from(payload.image, 'base64');
     
+    // Generate unique filename
+    const timestamp = Date.now();
+    const originalFilename = `event_${event.id}_${timestamp}.jpg`;
+    const annotatedFilename = `event_${event.id}_${timestamp}_annotated.jpg`;
+    const thumbnailFilename = `event_${event.id}_${timestamp}_thumb.jpg`;
+    
+    // Save original image
+    const originalPath = path.join(ORIGINAL_DIR, originalFilename);
+    await fs.writeFile(originalPath, imageBuffer);
+    
+    // Create thumbnail
+    const thumbnailPath = path.join(THUMBNAIL_DIR, thumbnailFilename);
+    await sharp(imageBuffer)
+      .resize(400, 300, { fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: 80 })
+      .toFile(thumbnailPath);
+    
     // Send to AI service
     const formData = new FormData();
     formData.append('file', imageBuffer, { filename: 'image.jpg', contentType: 'image/jpeg' });
@@ -133,6 +171,13 @@ const handleImageMessage = async (deviceId: string, payload: any) => {
     });
 
     const { detections, annotated_image, processing_time } = aiResponse.data;
+    
+    // Save annotated image if available
+    let annotatedPath = null;
+    if (annotated_image) {
+      annotatedPath = path.join(ANNOTATED_DIR, annotatedFilename);
+      await fs.writeFile(annotatedPath, Buffer.from(annotated_image, 'base64'));
+    }
 
     // Save detections
     for (const d of detections) {
@@ -147,19 +192,17 @@ const handleImageMessage = async (deviceId: string, payload: any) => {
       });
     }
 
-    // Update event with results
-    // In a real app, we would save the image to disk/S3 and store the URL
-    // For now, we'll just store the base64 as a data URL (not recommended for production DB size, but okay for demo)
-    // Or better, just store a placeholder URL since we don't have file storage set up yet
-    const imageUrl = `data:image/jpeg;base64,${payload.image}`;
-    const annotatedImageUrl = annotated_image ? `data:image/jpeg;base64,${annotated_image}` : null;
+    // Update event with file paths (use relative URLs for frontend)
+    const imageUrl = `/uploads/original/${originalFilename}`;
+    const thumbnailUrl = `/uploads/thumbnails/${thumbnailFilename}`;
+    const annotatedImageUrl = annotatedPath ? `/uploads/annotated/${annotatedFilename}` : null;
 
     const updatedEvent = await prisma.event.update({
       where: { id: event.id },
       data: {
         status: 'COMPLETED',
-        imageUrl: imageUrl, // Storing base64 directly for now
-        thumbnailUrl: annotatedImageUrl || imageUrl, // Use annotated image for thumbnail if available
+        imageUrl: imageUrl,
+        thumbnailUrl: annotatedImageUrl || thumbnailUrl, // Use annotated as thumbnail if available
         type: detections.length > 0 ? 'DETECTION' : 'MOTION',
       },
       include: {

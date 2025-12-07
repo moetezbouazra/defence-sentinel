@@ -64,8 +64,9 @@ services:
     ports:
       - "3001:3001"
     volumes:
-      - ./backend:/app
-      - /app/node_modules
+      - ./backend/src:/app/src
+      - ./backend/prisma:/app/prisma
+      - ./backend/uploads:/app/uploads
     environment:
       - DATABASE_URL=postgresql://postgres:password@postgres:5432/defence_sentinel
       - REDIS_URL=redis://redis:6379
@@ -92,7 +93,7 @@ services:
       - ./frontend:/app
       - /app/node_modules
     environment:
-      - VITE_API_URL=http://localhost:3001
+      - VITE_API_URL=http://localhost:3001/api
     networks:
       - sentinel-net
     depends_on:
@@ -101,11 +102,14 @@ services:
   iot-simulator:
     build: ./iot-simulator
     container_name: defence-sentinel-iot
+    ports:
+      - "4000:4000"
     volumes:
       - ./iot-simulator:/app
       - /app/node_modules
     environment:
       - MQTT_URL=mqtt://mosquitto:1883
+      - PORT=4000
     networks:
       - sentinel-net
     depends_on:

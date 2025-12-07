@@ -7,6 +7,8 @@
     "start": "node index.js"
   },
   "dependencies": {
-    "mqtt": "^5.3.5"
+    "mqtt": "^5.3.5",
+    "express": "^4.18.2",
+    "cors": "^2.8.5"
   }
 }

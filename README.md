@@ -21,6 +21,6 @@ AI-powered security surveillance system.
 
 ## Development
 
--   **Frontend**: `cd frontend && npm run dev`
--   **Backend**: `cd backend && npm run dev`
+-   **Frontend**: `cd frontend && yarn dev`
+-   **Backend**: `cd backend && yarn dev`
 -   **AI Service**: `cd ai-service && uvicorn main:app --reload`
