@@ -1,0 +1,12 @@
+{
+  "name": "defence-sentinel-iot-simulator",
+  "version": "1.0.0",
+  "description": "IoT Camera Simulator",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "mqtt": "^5.3.5"
+  }
+}

@@ -1,0 +1,122 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: defence-sentinel-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: defence_sentinel
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - sentinel-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: defence-sentinel-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - sentinel-net
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: defence-sentinel-mqtt
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - ./mosquitto/config/mosquitto.conf:/mosquitto/config/mosquitto.conf
+      - mosquitto_data:/mosquitto/data
+      - mosquitto_log:/mosquitto/log
+    networks:
+      - sentinel-net
+
+  ai-service:
+    build: ./ai-service
+    container_name: defence-sentinel-ai
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./ai-service:/app
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    networks:
+      - sentinel-net
+    depends_on:
+      - redis
+
+  backend:
+    build: ./backend
+    container_name: defence-sentinel-backend
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/defence_sentinel
+      - REDIS_URL=redis://redis:6379
+      - MQTT_URL=mqtt://mosquitto:1883
+      - AI_SERVICE_URL=http://ai-service:8000
+      - JWT_SECRET=supersecretkey
+      - PORT=3001
+    networks:
+      - sentinel-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      mosquitto:
+        condition: service_started
+
+  frontend:
+    build: ./frontend
+    container_name: defence-sentinel-frontend
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - VITE_API_URL=http://localhost:3001
+    networks:
+      - sentinel-net
+    depends_on:
+      - backend
+
+  iot-simulator:
+    build: ./iot-simulator
+    container_name: defence-sentinel-iot
+    volumes:
+      - ./iot-simulator:/app
+      - /app/node_modules
+    environment:
+      - MQTT_URL=mqtt://mosquitto:1883
+    networks:
+      - sentinel-net
+    depends_on:
+      - mosquitto
+
+networks:
+  sentinel-net:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  mosquitto_data:
+  mosquitto_log:
