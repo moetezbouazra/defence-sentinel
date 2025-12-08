@@ -118,8 +118,11 @@ export const triggerCameraCapture = async (deviceId: string) => {
 };
 
 export const getAvailableCameras = async () => {
-  const response = await axios.get(`${IOT_SIMULATOR_URL}/cameras`);
-  return response.data;
+  const response = await api.get('/devices');
+  // Return devices in format expected by Dashboard
+  return {
+    cameras: response.data.map((device: any) => device.deviceId)
+  };
 };
 
 export default api;

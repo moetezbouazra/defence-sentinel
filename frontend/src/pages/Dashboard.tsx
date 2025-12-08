@@ -66,6 +66,7 @@ const Dashboard = () => {
   const { data: cameras } = useQuery({
     queryKey: ['available-cameras'],
     queryFn: getAvailableCameras,
+    refetchInterval: 5000, // Refresh every 5 seconds
   });
 
   const triggerMutation = useMutation({
@@ -223,19 +224,27 @@ const Dashboard = () => {
               <p className="text-sm text-muted-foreground">
                 {t('triggerMotionDetection')}
               </p>
-              {cameras?.cameras?.map((cameraId: string) => (
-                <Button
-                  key={cameraId}
-                  onClick={() => triggerMutation.mutate(cameraId)}
-                  disabled={triggerMutation.isPending}
-                  variant="outline"
-                  className="w-full justify-between"
-                  size="sm"
-                >
-                  <span>{cameraId}</span>
-                  <Play className="h-4 w-4" />
-                </Button>
-              ))}
+              {cameras?.cameras && cameras.cameras.length > 0 ? (
+                cameras.cameras.map((cameraId: string) => (
+                  <Button
+                    key={cameraId}
+                    onClick={() => triggerMutation.mutate(cameraId)}
+                    disabled={triggerMutation.isPending}
+                    variant="outline"
+                    className="w-full justify-between"
+                    size="sm"
+                  >
+                    <span>{cameraId}</span>
+                    <Play className="h-4 w-4" />
+                  </Button>
+                ))
+              ) : (
+                <div className="text-center py-6 text-muted-foreground text-sm">
+                  <Camera className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                  <p>No cameras available</p>
+                  <p className="text-xs mt-1">Add devices to get started</p>
+                </div>
+              )}
             </CardContent>
           </Card>
 

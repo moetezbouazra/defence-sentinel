@@ -2,12 +2,17 @@ import { Request, Response } from 'express';
 import prisma from '../utils/prisma';
 import { z } from 'zod';
 
-export const getEvents = async (req: Request, res: Response) => {
+export const getEvents = async (req: any, res: Response) => {
   try {
+    const userId = req.user?.userId;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
     const { page = 1, limit = 10, deviceId, type, startDate, endDate } = req.query;
     const skip = (Number(page) - 1) * Number(limit);
 
-    const where: any = {};
+    const where: any = {
+      device: { userId }
+    };
     if (deviceId) where.deviceId = String(deviceId);
     if (type) where.type = String(type);
     if (startDate && endDate) {

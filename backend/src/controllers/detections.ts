@@ -1,12 +1,19 @@
 import { Request, Response } from 'express';
 import prisma from '../utils/prisma';
 
-export const getDetections = async (req: Request, res: Response) => {
+export const getDetections = async (req: any, res: Response) => {
   try {
+    const userId = req.user?.userId;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
     const { page = 1, limit = 20, className, threatLevel, eventId } = req.query;
     const skip = (Number(page) - 1) * Number(limit);
 
-    const where: any = {};
+    const where: any = {
+      event: {
+        device: { userId }
+      }
+    };
     if (className) where.className = String(className);
     if (threatLevel) where.threatLevel = String(threatLevel);
     if (eventId) where.eventId = String(eventId);
@@ -42,12 +49,26 @@ export const getDetections = async (req: Request, res: Response) => {
   }
 };
 
-export const getDetectionStats = async (req: Request, res: Response) => {
+export const getDetectionStats = async (req: any, res: Response) => {
   try {
-    const totalDetections = await prisma.detection.count();
+    const userId = req.user?.userId;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+    const totalDetections = await prisma.detection.count({
+      where: {
+        event: {
+          device: { userId }
+        }
+      }
+    });
     
     const byClass = await prisma.detection.groupBy({
       by: ['className'],
+      where: {
+        event: {
+          device: { userId }
+        }
+      },
       _count: {
         className: true,
       },
@@ -55,6 +76,11 @@ export const getDetectionStats = async (req: Request, res: Response) => {
 
     const byThreatLevel = await prisma.detection.groupBy({
       by: ['threatLevel'],
+      where: {
+        event: {
+          device: { userId }
+        }
+      },
       _count: {
         threatLevel: true,
       },

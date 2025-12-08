@@ -1,8 +1,11 @@
 import { Request, Response } from 'express';
 import prisma from '../utils/prisma';
 
-export const getDashboardStats = async (req: Request, res: Response) => {
+export const getDashboardStats = async (req: any, res: Response) => {
   try {
+    const userId = req.user?.userId;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
     const now = new Date();
     const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
@@ -14,19 +17,21 @@ export const getDashboardStats = async (req: Request, res: Response) => {
     ] = await Promise.all([
       prisma.event.count({
         where: {
-          timestamp: { gte: twentyFourHoursAgo }
+          timestamp: { gte: twentyFourHoursAgo },
+          device: { userId }
         }
       }),
       prisma.alert.count({
         where: {
           acknowledged: false,
-          severity: 'CRITICAL'
+          severity: 'CRITICAL',
+          userId
         }
       }),
       prisma.device.count({
-        where: { status: 'ONLINE' }
+        where: { status: 'ONLINE', userId }
       }),
-      prisma.device.count()
+      prisma.device.count({ where: { userId } })
     ]);
 
     res.json({
@@ -40,17 +45,21 @@ export const getDashboardStats = async (req: Request, res: Response) => {
   }
 };
 
-export const getTimeline = async (req: Request, res: Response) => {
+export const getTimeline = async (req: any, res: Response) => {
   try {
+    const userId = req.user?.userId;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
     const timeline = await prisma.$queryRaw`
-      SELECT DATE(timestamp) as date, COUNT(*) as count
-      FROM "Event"
-      WHERE timestamp >= ${sevenDaysAgo}
-      GROUP BY DATE(timestamp)
-      ORDER BY DATE(timestamp) ASC
+      SELECT DATE(e.timestamp) as date, COUNT(*) as count
+      FROM "Event" e
+      JOIN "Device" d ON e."deviceId" = d.id
+      WHERE e.timestamp >= ${sevenDaysAgo} AND d."userId" = ${userId}
+      GROUP BY DATE(e.timestamp)
+      ORDER BY DATE(e.timestamp) ASC
     `;
 
     const serializedTimeline = (timeline as any[]).map(item => ({
@@ -65,10 +74,18 @@ export const getTimeline = async (req: Request, res: Response) => {
   }
 };
 
-export const getThreatDistribution = async (req: Request, res: Response) => {
+export const getThreatDistribution = async (req: any, res: Response) => {
   try {
+    const userId = req.user?.userId;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
     const distribution = await prisma.detection.groupBy({
       by: ['threatLevel'],
+      where: {
+        event: {
+          device: { userId }
+        }
+      },
       _count: {
         threatLevel: true
       }
@@ -80,9 +97,13 @@ export const getThreatDistribution = async (req: Request, res: Response) => {
   }
 };
 
-export const getDevicePerformance = async (req: Request, res: Response) => {
+export const getDevicePerformance = async (req: any, res: Response) => {
   try {
+    const userId = req.user?.userId;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
     const devices = await prisma.device.findMany({
+      where: { userId },
       include: {
         events: {
           where: {

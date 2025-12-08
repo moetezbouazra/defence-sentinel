@@ -14,8 +14,9 @@ app.use(express.json());
 
 // Function to trigger motion detection for a specific camera
 async function triggerMotion(deviceId) {
-  if (!CAMERAS.includes(deviceId)) {
-    throw new Error(`Invalid camera ID: ${deviceId}`);
+  // Accept any deviceId (not just hardcoded ones)
+  if (!deviceId || typeof deviceId !== 'string') {
+    throw new Error('Invalid device ID');
   }
 
   const motionPayload = {

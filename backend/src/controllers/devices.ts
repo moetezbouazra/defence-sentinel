@@ -8,9 +8,13 @@ const deviceSchema = z.object({
   location: z.string().optional(),
 });
 
-export const getDevices = async (req: Request, res: Response) => {
+export const getDevices = async (req: any, res: Response) => {
   try {
+    const userId = req.user?.userId;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
     const devices = await prisma.device.findMany({
+      where: { userId },
       orderBy: { createdAt: 'desc' },
     });
     res.json(devices);
@@ -19,8 +23,11 @@ export const getDevices = async (req: Request, res: Response) => {
   }
 };
 
-export const createDevice = async (req: Request, res: Response) => {
+export const createDevice = async (req: any, res: Response) => {
   try {
+    const userId = req.user?.userId;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
     const { name, deviceId, location } = deviceSchema.parse(req.body);
     
     const existing = await prisma.device.findUnique({ where: { deviceId } });
@@ -29,21 +36,33 @@ export const createDevice = async (req: Request, res: Response) => {
     }
 
     const device = await prisma.device.create({
-      data: { name, deviceId, location },
+      data: { 
+        name, 
+        deviceId, 
+        location, 
+        userId,
+        status: 'ONLINE', // Default to ONLINE for manually created devices
+      },
     });
     res.status(201).json(device);
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: error.errors });
     }
+    console.error('Error creating device:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
 
-export const getDevice = async (req: Request, res: Response) => {
+export const getDevice = async (req: any, res: Response) => {
   try {
     const { id } = req.params;
-    const device = await prisma.device.findUnique({ where: { id } });
+    const userId = req.user?.userId;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+    const device = await prisma.device.findFirst({ 
+      where: { id, userId } 
+    });
     if (!device) return res.status(404).json({ error: 'Device not found' });
     res.json(device);
   } catch (error) {
