@@ -74,6 +74,7 @@ services:
       - AI_SERVICE_URL=http://ai-service:8000
       - JWT_SECRET=supersecretkey
       - PORT=3001
+      - N8N_WEBHOOK_URL=http://n8n:5678/webhook
     networks:
       - sentinel-net
     depends_on:
@@ -115,6 +116,27 @@ services:
     depends_on:
       - mosquitto
 
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: defence-sentinel-n8n
+    ports:
+      - "5678:5678"
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./backend/uploads:/data/uploads:ro
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=admin
+      - N8N_BASIC_AUTH_PASSWORD=admin123
+      - N8N_HOST=localhost
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - WEBHOOK_URL=http://localhost:5678
+      - GENERIC_TIMEZONE=Africa/Tunis
+    networks:
+      - sentinel-net
+    restart: unless-stopped
+
 networks:
   sentinel-net:
     driver: bridge
@@ -124,3 +146,4 @@ volumes:
   redis_data:
   mosquitto_data:
   mosquitto_log:
+  n8n_data:

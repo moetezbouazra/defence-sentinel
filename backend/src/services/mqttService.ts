@@ -1,6 +1,7 @@
 import mqtt from 'mqtt';
 import prisma from '../utils/prisma';
 import { getIo } from './socketService';
+import { sendNotificationWebhook, getPublicImageUrl } from './notificationService';
 import axios from 'axios';
 import FormData from 'form-data';
 import fs from 'fs/promises';
@@ -219,16 +220,38 @@ const handleImageMessage = async (deviceId: string, payload: any) => {
     });
 
     if (criticalDetections.length > 0) {
+      const maxThreatDetection = criticalDetections[0];
+      const severity = getThreatLevel(maxThreatDetection.class, maxThreatDetection.confidence) === 'CRITICAL' ? 'CRITICAL' : 'WARNING';
+      
       const alert = await prisma.alert.create({
         data: {
           eventId: event.id,
-          severity: 'CRITICAL',
-          title: `Threat Detected: ${criticalDetections[0].class}`,
-          message: `${criticalDetections.length} threats detected on ${deviceId}`,
+          severity,
+          title: `Threat Detected: ${maxThreatDetection.class}`,
+          message: `${criticalDetections.length} threat${criticalDetections.length > 1 ? 's' : ''} detected on ${event.device.name}`,
           acknowledged: false,
         }
       });
+      
       getIo().emit('alert:new', alert);
+
+      // Send notification to n8n webhook
+      const imageUrl = annotatedPath ? await getPublicImageUrl(annotatedPath) : null;
+      await sendNotificationWebhook({
+        type: 'alert',
+        severity,
+        title: alert.title,
+        message: alert.message,
+        deviceName: event.device.name,
+        timestamp: new Date().toISOString(),
+        annotatedImagePath: annotatedPath || undefined,
+        thumbnailPath: thumbnailPath,
+        detections: criticalDetections.map((d: any) => ({
+          className: d.class,
+          confidence: d.confidence,
+          threatLevel: getThreatLevel(d.class, d.confidence),
+        })),
+      });
     }
 
     getIo().emit('event:update', updatedEvent);
