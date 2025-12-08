@@ -2,6 +2,7 @@ import mqtt from 'mqtt';
 import prisma from '../utils/prisma';
 import { getIo } from './socketService';
 import { sendNotificationWebhook, getPublicImageUrl } from './notificationService';
+import { emailService } from './emailService';
 import axios from 'axios';
 import FormData from 'form-data';
 import fs from 'fs/promises';
@@ -60,21 +61,39 @@ export const initMqtt = () => {
 };
 
 const handleStatusMessage = async (deviceId: string, payload: any) => {
-  await prisma.device.upsert({
-    where: { deviceId },
-    update: {
-      status: payload.status === 'online' ? 'ONLINE' : 'OFFLINE',
-      lastSeen: new Date(),
-      metadata: payload,
-    },
-    create: {
-      deviceId,
-      name: deviceId,
-      status: payload.status === 'online' ? 'ONLINE' : 'OFFLINE',
-      lastSeen: new Date(),
-      metadata: payload,
-    },
-  });
+  // Check if device exists
+  const existingDevice = await prisma.device.findUnique({ where: { deviceId } });
+  
+  if (existingDevice) {
+    // Update existing device
+    await prisma.device.update({
+      where: { deviceId },
+      data: {
+        status: payload.status === 'online' ? 'ONLINE' : 'OFFLINE',
+        lastSeen: new Date(),
+        metadata: payload,
+      },
+    });
+  } else {
+    // Create new device - assign to first user
+    const firstUser = await prisma.user.findFirst({ orderBy: { createdAt: 'asc' } });
+    if (!firstUser) {
+      console.error('No users in system - cannot create device');
+      return;
+    }
+    
+    await prisma.device.create({
+      data: {
+        deviceId,
+        name: deviceId,
+        status: payload.status === 'online' ? 'ONLINE' : 'OFFLINE',
+        lastSeen: new Date(),
+        metadata: payload,
+        userId: firstUser.id,
+      },
+    });
+    console.log(`✅ Auto-created device ${deviceId} for user ${firstUser.email}`);
+  }
   
   try {
     getIo().emit('device:status', { deviceId, status: payload.status });
@@ -89,13 +108,22 @@ const handleMotionMessage = async (deviceId: string, payload: any) => {
   // Ensure device exists
   let device = await prisma.device.findUnique({ where: { deviceId } });
   if (!device) {
+    // Auto-assign new devices to the first user in the system
+    const firstUser = await prisma.user.findFirst({ orderBy: { createdAt: 'asc' } });
+    if (!firstUser) {
+      console.error('No users in system - cannot create device');
+      return;
+    }
+    
     device = await prisma.device.create({
       data: {
         deviceId,
         name: deviceId,
         status: 'ONLINE',
+        userId: firstUser.id,
       }
     });
+    console.log(`✅ Auto-created device ${deviceId} for user ${firstUser.email}`);
   }
 
   // Create event
@@ -125,7 +153,13 @@ const handleImageMessage = async (deviceId: string, payload: any) => {
       createdAt: { gt: new Date(Date.now() - 60000) }
     },
     orderBy: { createdAt: 'desc' },
-    include: { device: true }
+    include: { 
+      device: {
+        include: {
+          user: true
+        }
+      }
+    }
   });
 
   if (!event) {
@@ -207,7 +241,11 @@ const handleImageMessage = async (deviceId: string, payload: any) => {
         type: detections.length > 0 ? 'DETECTION' : 'MOTION',
       },
       include: {
-        device: true,
+        device: {
+          include: {
+            user: true
+          }
+        },
         detections: true,
         alerts: true
       }
@@ -226,6 +264,7 @@ const handleImageMessage = async (deviceId: string, payload: any) => {
       const alert = await prisma.alert.create({
         data: {
           eventId: event.id,
+          userId: event.device.userId,
           severity,
           title: `Threat Detected: ${maxThreatDetection.class}`,
           message: `${criticalDetections.length} threat${criticalDetections.length > 1 ? 's' : ''} detected on ${event.device.name}`,
@@ -234,6 +273,31 @@ const handleImageMessage = async (deviceId: string, payload: any) => {
       });
       
       getIo().emit('alert:new', alert);
+
+      // Send email notification to device owner
+      console.log(`📧 Checking email notification: user=${event.device.user?.email}, annotatedPath=${annotatedPath ? 'exists' : 'missing'}`);
+      if (event.device.user?.email && annotatedPath) {
+        try {
+          await emailService.sendAlertEmail(event.device.user.email, {
+            alertId: alert.id,
+            severity: severity as 'CRITICAL' | 'WARNING' | 'INFO',
+            title: alert.title,
+            message: alert.message,
+            deviceName: event.device.name,
+            deviceLocation: event.device.location || undefined,
+            timestamp: new Date(),
+            annotatedImagePath: annotatedPath,
+            detections: criticalDetections.map((d: any) => ({
+              className: d.class,
+              confidence: d.confidence,
+              threatLevel: getThreatLevel(d.class, d.confidence),
+            })),
+          });
+          console.log(`✅ Alert email sent to ${event.device.user.email}`);
+        } catch (emailError) {
+          console.error('Failed to send alert email:', emailError);
+        }
+      }
 
       // Send notification to n8n webhook
       const imageUrl = annotatedPath ? await getPublicImageUrl(annotatedPath) : null;
