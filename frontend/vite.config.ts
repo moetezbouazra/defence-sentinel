@@ -10,4 +10,7 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  server: {
+  allowedHosts: ['vps-808bca14.vps.ovh.net'],
+}
 })

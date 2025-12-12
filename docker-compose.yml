@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   postgres:
     image: postgres:16-alpine
@@ -73,12 +71,14 @@ services:
       - MQTT_URL=${MQTT_URL}
       - AI_SERVICE_URL=${AI_SERVICE_URL}
       - JWT_SECRET=${JWT_SECRET}
-      - PORT=${PORT}
+      - PORT=3001
+      - NODE_ENV=${NODE_ENV:-production}
       - EMAIL_USER=${EMAIL_USER}
       - EMAIL_PASSWORD=${EMAIL_PASSWORD}
       - EMAIL_HOST=${EMAIL_HOST}
       - EMAIL_PORT=${EMAIL_PORT}
       - N8N_WEBHOOK_URL=${N8N_WEBHOOK_URL}
+      - CORS_ORIGIN=${CORS_ORIGIN}
     networks:
       - sentinel-net
     depends_on:
@@ -87,6 +87,8 @@ services:
       redis:
         condition: service_started
       mosquitto:
+        condition: service_started
+      ai-service:
         condition: service_started
 
   frontend:
@@ -115,7 +117,7 @@ services:
       - /app/node_modules
     environment:
       - MQTT_URL=${MQTT_URL}
-      - PORT=${PORT}
+      - PORT=4000
     networks:
       - sentinel-net
     depends_on:
