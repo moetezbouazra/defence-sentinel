@@ -13,11 +13,7 @@ When a critical threat is detected (person with confidence > 0.65), the backend 
 
 ## Starting n8n
 
-n8n is included in the Docker Compose setup:
-
-```bash
-docker compose up -d n8n
-```
+Since n8n is installed separately on your VPS, start it manually or via your preferred method.
 
 Access n8n at: **http://localhost:5678**
 
@@ -29,7 +25,7 @@ Access n8n at: **http://localhost:5678**
 
 The backend sends POST requests to:
 ```
-http://n8n:5678/webhook/defence-sentinel-notification
+http://localhost:5678/webhook/defence-sentinel-notification
 ```
 
 ### Webhook Payload Structure
@@ -86,7 +82,7 @@ http://localhost:3001/uploads/annotated/event_{eventId}_{timestamp}_annotated.jp
 4. **Add HTTP Request Node** (Fetch Image)
    - Connect to "true" branch of IF node
    - Method: GET
-   - URL: `http://backend:3001{{ $json.imageUrl }}`
+   - URL: `http://localhost:3001{{ $json.imageUrl }}`
    - Response Format: File
    - Binary Property: `image`
    

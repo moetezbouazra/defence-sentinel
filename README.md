@@ -10,16 +10,36 @@ AI-powered security surveillance system.
     docker-compose up --build
     ```
 
+    The backend will automatically:
+    - Wait for PostgreSQL to be ready
+    - Run database migrations
+    - Generate Prisma client
+    - Start the application
+
+## Database
+
+Database schema and migrations are handled automatically when starting the services. The backend container includes a startup script that:
+
+- Waits for PostgreSQL to be healthy
+- Applies any pending migrations
+- Generates the Prisma client
+
+For development outside Docker, you can manually run migrations with:
+```bash
+cd backend
+npx prisma migrate deploy
+```
+
 ## Services
 
--   **Frontend**: http://localhost:5173
+-   **Frontend**: http://localhost:5174
 -   **Backend**: http://localhost:3001
 -   **AI Service**: http://localhost:8000
 -   **n8n Automation**: http://localhost:5678 (admin/admin123)
 -   **IoT Simulator**: http://localhost:4000
 -   **Mosquitto**: 1883 (MQTT), 9001 (WebSockets)
--   **Postgres**: 5432
--   **Redis**: 6379
+-   **Postgres**: 5433
+-   **Redis**: 6380
 
 ## Features
 
